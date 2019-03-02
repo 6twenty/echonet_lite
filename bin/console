@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+gem 'bundler' # This ensures we're using the correct version
 require "bundler/setup"
 require "mitsubishi_ac"
 
