@@ -1,7 +1,7 @@
 module EchonetLite
   class Frame
-    attr_reader :ip, :protocol_type, :format, :properties, :valid
-    attr_reader :EHD1, :EHD2, :TID, :SEOJ, :DEOJ, :ESV
+    attr_reader :ip, :protocol_type, :format, :properties
+    attr_reader :source_object, :destination_object
 
     def initialize(data, ip)
       @ip = ip
@@ -31,21 +31,21 @@ module EchonetLite
     # EHD2 = 0x81 (Format 1)
     # TID = Transaction ID
     def decode_header(data)
-      @EHD1 = data[0]
-      @EHD2 = data[1]
-      @TID = data[2...4]
+      @ehd1 = data[0]
+      @ehd2 = data[1]
+      @tid = data[2...4]
 
-      if @EHD1 == 0x10
+      if @ehd1 == 0x10
         @protocol_type = 'ECHONET_Lite'
-      elsif @EHD1 >= 0x80
+      elsif @ehd1 >= 0x80
         @protocol_type = 'ECHONET'
       else
         @protocol_type = 'UNKNOWN'
       end
 
-      if @EHD2 == 0x81
+      if @ehd2 == 0x81
         @format = '1'
-      elsif @EHD2 == 0x82
+      elsif @ehd2 == 0x82
         @format = '2'
       else
         @format = 'UNKNOWN'
@@ -66,21 +66,40 @@ module EchonetLite
     # PDC = Property data counter (EDT bytes)
     # EDT = Property value data (on, off etc)
     def decode_data(data)
-      @SEOJ = data[0...3]
-      @DEOJ = data[3...6]
-      @ESV = data[6]
-      @OPC = data[7]
+      @seoj = data[0...3]
+      @deoj = data[3...6]
+      @esv = data[6]
+      @opc = data[7]
+
+      @source_object = Profile.build(@seoj)
+      @destination_object = Profile.build(@deoj)
 
       @properties = []
       property_data = data[8..].dup
 
-      @OPC.times do
+      @opc.times do
         epc = property_data.shift
         pdc = property_data.shift
         edt = property_data.shift(pdc)
 
-        @properties << Property.new(epc, pdc, edt)
+        profile = if request?
+          @destination_object
+        elsif response?
+          @source_object
+        else
+          raise "Could not determine if request or response (#{@esv})"
+        end
+
+        @properties << Property.new(epc, pdc, edt, profile)
       end
+    end
+
+    def request?
+      ESV::REQUEST_CODES.values.include?(@esv)
+    end
+
+    def response?
+      ESV::RESPONSE_CODES.values.include?(@esv)
     end
   end
 end

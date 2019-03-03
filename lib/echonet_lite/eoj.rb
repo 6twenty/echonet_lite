@@ -1,19 +1,6 @@
 module EchonetLite
-  module EOJ
-    # 0x00 Sensor-related device class group
-    # 0x01 Air conditioner-related device class group
-    # 0x02 Housing/facility-related device class group
-    # 0x03 Cooking/housework-related device class group
-    # 0x04 Health-related device class group
-    # 0x05 Management/control-related device class group
-    # 0x06 AV-related device class group
-    # 0x07-0x0D Reserved for future use
-    # 0x0E Profile class group
-    # 0x0F User definition class group
-    # 0x10-0xFF Reserved for future use
-
-    # EOJX1 => Group Name
-    EOJX_GROUP = {
+  module EOJ # Reference only
+    CLASS_GROUP_LOOKUP = {
       0x00 => 'Sensor-related device group',
       0x01 => 'Air conditioner-related device group',
       0x02 => 'Housing/facility-related device group',
@@ -25,8 +12,7 @@ module EchonetLite
       0x0F => 'User definition group'
     }
 
-    # EOJX2 => Name
-    EOJX_CLASS = {
+    CLASS_LOOKUP = {
       0x00 => { # Sensor-related device group
         0x01 => 'Gas leak sensor',
         0x02 => 'Crime prevention sensor',

@@ -1,17 +1,5 @@
 module EchonetLite
-  module EPC
-    # # EHD1 => ECHONET Lite Header 1
-    # EHD1 = {
-    #   0x00 => 'Not available',
-    #   0x10 => 'Conventional ECHONET Lite Specification'
-    # }
-
-    # # EHD2 => ECHONET Lite Header 2
-    # EHD2 = {
-    #   0x81 => 'Format 1 [specified message format]',
-    #   0x82 => 'Format 2 [arbitrary message format]'
-    # }
-
+  module EPC # Reference only
     # EPC set
     EPC_CODE = {
       0x00 => { # Sensor-related device class group
@@ -1334,7 +1322,7 @@ module EchonetLite
       0x9C => 'GetM property map',
       0x9D => 'Status change announcement property map',
       0x9E => 'Set property map',
-      0x9F => 'Get property map',
+      0x9F => 'Get property map'
     }
   end
 end

@@ -1,11 +1,16 @@
 module EchonetLite
   class Device
-    attr_reader :last_frame, :ip, :EOJ
+    DEVICES = {}
 
-    def initialize(frame)
-      @last_frame = frame
-      @ip = frame.ip
-      @EOJ = frame.SEOJ
+    def self.register(ip, profile)
+      DEVICES[ip] ||= new(ip, profile)
+    end
+
+    attr_reader :ip, :profile
+
+    def initialize(ip, profile)
+      @ip = ip
+      @profile = profile
     end
   end
 end
