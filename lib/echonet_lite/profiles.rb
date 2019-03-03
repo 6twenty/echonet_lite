@@ -1,27 +1,22 @@
 module EchonetLite
   module Profiles
-    LOOKUP = Hash.new({})
+    LOOKUP = {}
 
     def self.build(eoj)
       LOOKUP[eoj[0]][eoj[1]].new(eoj[2])
     end
 
     class Base
-      def self.inherited(subclass)
-        subclass.class_eval do
-          def self.inherited(subclass)
-            register(subclass)
-          end
-        end
-      end
+      def self.register(code)
+        self.const_set(:CODE, code)
 
-      def self.register(subclass)
-        return unless subclass.const_defined?(:CODE)
+        return if self.superclass == Base
 
-        class_group_code = subclass.superclass.const_get(:CODE)
-        class_code = subclass.const_get(:CODE)
+        group_code = self.superclass.const_get(:CODE)
 
-        LOOKUP[class_group_code][class_code] = subclass
+        LOOKUP[group_code] ||= {}
+
+        LOOKUP[group_code][code] = self
       end
 
       attr_reader :id
@@ -35,11 +30,11 @@ module EchonetLite
       end
 
       def class_group_code
-        self.class.superclass.class_variable_get(:CODE)
+        self.class.superclass.const_get(:CODE)
       end
 
       def class_code
-        self.class.class_variable_get(:CODE)
+        self.class.const_get(:CODE)
       end
 
       def parse_edt(property_name, edt)
@@ -48,26 +43,26 @@ module EchonetLite
     end
 
     class AirConditionerRelatedDeviceGroup < Base
-      CODE = 0x01
+      register(0x01)
 
       class HomeAirConditioner < AirConditionerRelatedDeviceGroup
-        CODE = 0x30
+        register(0x30)
       end
     end
 
     class ManagementControlRelatedDeviceGroup < Base
-      CODE = 0x05
+      register(0x05)
 
       class Controller < ManagementControlRelatedDeviceGroup
-        CODE = 0xFF
+        register(0xFF)
       end
     end
 
     class ProfileGroup < Base
-      CODE = 0x0E
+      register(0x0E)
 
       class NodeProfile < ProfileGroup
-        CODE = 0xF0
+        register(0xF0)
 
         EPC = {
           operating_status: 0x80,
@@ -75,14 +70,12 @@ module EchonetLite
         }
 
         def parse_operating_status(edt)
-          status = case edt
-          when 0x30 then :booting
-          when 0x31 then :not_booting
-          else
-            :unknown
-          end
+          values = {
+            0x30 => :booting,
+            0x31 => :not_booting
+          }
 
-          { operating_status: status }
+          { operating_status: values.fetch(edt, :unknown) }
         end
 
         def parse_self_node_instance_list_s(edt)
@@ -90,7 +83,7 @@ module EchonetLite
 
           profiles = instances_count.times.map do
             instance_eoj = edt.shift(3)
-            Profile.build(instance_eoj)
+            Profiles.build(instance_eoj)
           end
 
           { self_node_instance_list_s: profiles }

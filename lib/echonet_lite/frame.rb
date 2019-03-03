@@ -1,7 +1,7 @@
 module EchonetLite
   class Frame
     attr_reader :ip, :protocol_type, :format, :properties
-    attr_reader :source_object, :destination_object
+    attr_reader :source_profile, :destination_profile
 
     def initialize(data, ip)
       @ip = ip
@@ -71,8 +71,8 @@ module EchonetLite
       @esv = data[6]
       @opc = data[7]
 
-      @source_object = Profile.build(@seoj)
-      @destination_object = Profile.build(@deoj)
+      @source_profile = Profiles.build(@seoj)
+      @destination_profile = Profiles.build(@deoj)
 
       @properties = []
       property_data = data[8..].dup
@@ -83,9 +83,9 @@ module EchonetLite
         edt = property_data.shift(pdc)
 
         profile = if request?
-          @destination_object
+          @destination_profile
         elsif response?
-          @source_object
+          @source_profile
         else
           raise "Could not determine if request or response (#{@esv})"
         end
@@ -95,11 +95,11 @@ module EchonetLite
     end
 
     def request?
-      ESV::REQUEST_CODES.values.include?(@esv)
+      REQUEST_CODES.values.include?(@esv)
     end
 
     def response?
-      ESV::RESPONSE_CODES.values.include?(@esv)
+      RESPONSE_CODES.values.include?(@esv)
     end
   end
 end

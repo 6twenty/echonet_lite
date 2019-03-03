@@ -41,6 +41,8 @@ module EchonetLite
 
   LISTENERS = []
 
+  @@thread = nil
+
   def self.decode_msg(msg)
     msg.scan(/.{1,#{2}}/).map(&:hex)
   end
@@ -81,7 +83,7 @@ module EchonetLite
     mreq = IPAddr.new(ENL_MULTICAST_ADDRESS).hton + IPAddr.new("0.0.0.0").hton
     udps.setsockopt(Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP, mreq)
 
-    Thread.start do
+    @@thread = Thread.start do
       loop do
         packet, addr = udps.recvfrom(65535)
         _, port, ip, _ = addr
@@ -105,16 +107,20 @@ module EchonetLite
   end
 
   def self.discover
+    self.start if @@thread.nil?
+
     devices = []
 
-    listener = (frame) -> do
+    listener = -> (frame) do
       is_node_profile = frame.source_profile.is_a?(Profiles::ProfileGroup::NodeProfile)
       has_instance_list = frame.properties.any? do |property|
         property.name == :self_node_instance_list_s
       end
 
       if frame.response? && is_node_profile && has_instance_list
-        frame.properties.first.parsed.each do |instance|
+        instances = frame.properties.first.data[:self_node_instance_list_s]
+
+        instances.each do |instance|
           devices << Device.register(frame.ip, instance)
         end
       end
