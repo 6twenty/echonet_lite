@@ -46,14 +46,14 @@ module EchonetLite
           type: :hash,
           values: {
             0x41 => :auto,
-            0x31 => :lowest,
+            0x31 => :minimum,
             0x32 => :low,
-            0x33 => :low_middle,
-            0x34 => :low_high,
-            0x35 => :high_low,
-            0x36 => :high_middle,
-            0x37 => :high,
-            0x38 => :highest
+            0x33 => :medium_low,
+            0x34 => :medium,
+            0x35 => :medium_high,
+            0x36 => :high,
+            0x37 => :higher,
+            0x38 => :maximum
           }
         })
 

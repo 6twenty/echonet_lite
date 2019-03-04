@@ -1,13 +1,17 @@
 module EchonetLite
   class Frame
-    attr_reader :ip, :protocol_type, :format
-    attr_reader :source_device, :destination_device
-    attr_reader :tid
+    attr_reader :ip, :protocol_type, :format, :tid, :opc
+    attr_reader :device, :property_data
 
     def initialize(data, ip)
       @ip = ip
+      @data = data
 
       decode(data)
+
+      unless type == :request
+        Device.from_eoj(@seoj, ip).handle_frame(self)
+      end
     end
 
     def valid?
@@ -81,26 +85,7 @@ module EchonetLite
       @deoj = data[3...6]
       @esv = data[6]
       @opc = data[7]
-
-      # Don't continue unless successful response
-      if type == :response_not_possible
-        return
-      end
-
-      @source_device = Device.from_eoj(@seoj, ip)
-      @destination_device = Device.from_eoj(@deoj, ip)
-
-      @properties = []
-      property_data = data[8..]
-
-      @opc.times do
-        epc = property_data.shift
-        pdc = property_data.shift
-        edt = property_data.shift(pdc)
-
-        # Source device is assumed when properties are present
-        @source_device.receive_property(epc, pdc, edt)
-      end
+      @property_data = data[8..]
     end
   end
 end

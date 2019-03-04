@@ -11,6 +11,8 @@ require "echonet_lite/properties/management_control_related_device_group"
 require "echonet_lite/properties/profile_group"
 
 module EchonetLite
+  EchonetLiteError = Class.new(StandardError)
+
   ENL_PORT = 3610
   ENL_MULTICAST_ADDRESS = "224.0.23.0"
 

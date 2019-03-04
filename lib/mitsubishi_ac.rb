@@ -7,7 +7,9 @@ module MitsubishiAc
 
     # Only air conditioners
     devices.select! do |device|
-      device.profile.is_a?(EchonetLite::Profiles::AirConditionerRelatedDeviceGroup::HomeAirConditioner)
+      device.profile.class.to_s.rpartition("::").last == "HomeAirConditioner"
     end
+
+    devices.each(&:update)
   end
 end
