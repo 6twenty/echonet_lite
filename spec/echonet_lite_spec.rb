@@ -1,6 +1,6 @@
-RSpec.describe MitsubishiAc do
+RSpec.describe EchonetLite do
   it "has a version number" do
-    expect(MitsubishiAc::VERSION).not_to be_nil
+    expect(EchonetLite::VERSION).not_to be_nil
   end
 
   it "does something useful" do

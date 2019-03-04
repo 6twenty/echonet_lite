@@ -1,5 +1,5 @@
 require "bundler/setup"
-require "mitsubishi_ac"
+require "echonet_lite"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

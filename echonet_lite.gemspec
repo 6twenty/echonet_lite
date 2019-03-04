@@ -1,11 +1,11 @@
 
 lib = File.expand_path("../lib", __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require "mitsubishi_ac/version"
+require "echonet_lite/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "mitsubishi_ac"
-  spec.version       = MitsubishiAc::VERSION
+  spec.name          = "echonet_lite"
+  spec.version       = EchonetLite::VERSION
   spec.authors       = ["Mike Fulcher"]
   spec.email         = ["michael.fulcher@gmail.com"]
 
