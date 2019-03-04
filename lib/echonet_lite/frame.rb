@@ -14,6 +14,16 @@ module EchonetLite
       @valid
     end
 
+    def type
+      if REQUEST_RANGE.cover?(@esv)
+        :request
+      elsif RESPONSE_RANGE.cover?(@esv)
+        :response
+      elsif RESPONSE_NOT_POSSIBLE_RANGE.cover?(@esv)
+        :response_not_possible
+      end
+    end
+
     def decode(data)
       if data.size < 12
         @valid = false
@@ -72,11 +82,16 @@ module EchonetLite
       @esv = data[6]
       @opc = data[7]
 
+      # Don't continue unless successful response
+      if type == :response_not_possible
+        return
+      end
+
       @source_device = Device.from_eoj(@seoj, ip)
       @destination_device = Device.from_eoj(@deoj, ip)
 
       @properties = []
-      property_data = data[8..].dup
+      property_data = data[8..]
 
       @opc.times do
         epc = property_data.shift

@@ -29,8 +29,9 @@ module EchonetLite
       end
     end
 
-    def request_property(epc)
-      EchonetLite.send_OPC1(ip, @eoj, REQUEST_CODES[:get], epc)
+    def request_property(epc_or_name)
+      epc = profile.class.properties[epc_or_name][:epc]
+      tid = EchonetLite.send_OPC1(ip, @eoj, ESV_CODES[:get], epc)
     end
 
     def receive_property(epc, pdc, edt)
@@ -50,7 +51,7 @@ module EchonetLite
 
       instances_count.times.map do
         instance_eoj = edt.shift(3)
-        Device.from_eoj(instance_eoj, ip).tap(&:init)
+        Device.from_eoj(instance_eoj, ip)
       end
     end
 
@@ -60,6 +61,10 @@ module EchonetLite
 
     def process_epc_temp(edt, detail)
       edt[0] == 0x7E ? :unknown : edt[0]
+    end
+
+    def process_epc_string(edt, detail)
+      edt.pack("C*").strip
     end
   end
 end

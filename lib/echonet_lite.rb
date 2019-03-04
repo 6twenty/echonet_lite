@@ -14,7 +14,6 @@ module EchonetLite
   ENL_PORT = 3610
   ENL_MULTICAST_ADDRESS = "224.0.23.0"
 
-  # These values never change
   EHD1 = 0x10 # (Echonet Lite)
   EHD2 = 0x81 # (Format 1)
   TID = [0x00, 0x00] # Transaction ID (will increment)
@@ -22,26 +21,27 @@ module EchonetLite
     [profile.class_group_code, profile.class_code, 0x01]
   end
 
-  REQUEST_CODES = {
-    getc: 0x60,
-    setc: 0x61,
-    get: 0x62,
-    infreq: 0x63,
-    setget: 0x6E,
-    inf: 0x73,
-    infc: 0x74
-  }
+  RESPONSE_NOT_POSSIBLE_RANGE = 0x50..0x5F
+  REQUEST_RANGE = 0x60..0x6F
+  RESPONSE_RANGE = 0x70..0x7F
 
-  RESPONSE_CODES = {
-    setres: 0x71,
-    getres: 0x72,
-    infc_res: 0x7A,
-    setget_res: 0x7E,
-    seti_sna: 0x50,
-    setc_snd: 0x51,
-    get_sna: 0x52,
-    inf_sna: 0x53,
-    setget_sna: 0x5E
+  ESV_CODES = {
+    seti: 0x60, # Property value write request (no response required)
+    setc: 0x61, # Property value write request (response required)
+    get: 0x62, # Property value read request
+    inf_req: 0x63, # Property value notification request
+    setget: 0x6E, # Property value write & read request
+    set_res: 0x71, # Property value write response
+    get_res: 0x72, # Property value read response
+    inf: 0x73, # Property value notification
+    infc: 0x74, # Property value notification (response required)
+    infc_res: 0x7A, # Property value notification response
+    setget_res: 0x7E, # Property value write & read response
+    seti_sna: 0x50, # Property value write request (response not possible)
+    setc_sna: 0x51, # Property value write request (response not possible)
+    get_sna: 0x52, # Property value read (response not possible)
+    inf_sna: 0x53, # Property value notification (response not possible)
+    setget_sna: 0x5E # Property value write & read (response not possible)
   }
 
   @@thread = nil
@@ -91,7 +91,9 @@ module EchonetLite
   end
 
   def self.send_OPC1(ip, deoj, esv, epc, edt = [])
-    udp_send(ip, encode_msg(next_tid, SEOJ, deoj, esv, epc, edt))
+    next_tid.tap do |tid|
+      udp_send(ip, encode_msg(tid, SEOJ, deoj, esv, epc, edt))
+    end
   end
 
   def self.setup
