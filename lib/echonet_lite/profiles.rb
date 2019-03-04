@@ -7,14 +7,32 @@ module EchonetLite
     end
 
     class Base
-      def self.register(code)
+      def self.register_class_group(code)
         self.const_set(:CODE, code)
+      end
 
-        return if self.superclass == Base
+      def self.register_class(code)
+        self.const_set(:CODE, code)
 
         group_code = self.superclass.const_get(:CODE)
 
         LOOKUP[group_code][code] = self
+      end
+
+      def self.register_property(epc, name, detail)
+        detail[:epc] = epc
+        detail[:name] = name
+
+        properties[epc] = detail
+        properties[name] = detail
+      end
+
+      def self.properties
+        unless self.class_variable_defined?(:@@properties)
+          self.class_variable_set(:@@properties, {})
+        end
+
+        self.class_variable_get(:@@properties)
       end
 
       attr_reader :device
@@ -34,74 +52,29 @@ module EchonetLite
       def class_code
         self.class.const_get(:CODE)
       end
-
-      def can_process_epc?(epc)
-        return false unless self.class.const_defined?(:EPC)
-        return false unless self.class::EPC.invert.key?(epc)
-
-        true
-      end
-
-      def process_epc(epc, edt)
-        return unless can_process_epc?(epc)
-
-        epc_name = self.class::EPC.invert[epc]
-        send("receive_#{epc_name}", edt.dup)
-      end
     end
 
     class AirConditionerRelatedDeviceGroup < Base
-      register(0x01)
+      register_class_group 0x01
 
       class HomeAirConditioner < AirConditionerRelatedDeviceGroup
-        register(0x30)
-
-        EPC = {
-          operation_status: 0x80,
-          operation_mode_setting: 0xB0
-        }
-
-        def receive_operation_status(edt)
-          values = {
-            0x30 => :on,
-            0x31 => :off
-          }
-
-          values.fetch(edt[0], :unknown)
-        end
-
-        def receive_operation_mode_setting(edt)
-
-        end
+        register_class 0x30
       end
     end
 
     class ManagementControlRelatedDeviceGroup < Base
-      register(0x05)
+      register_class_group 0x05
 
       class Controller < ManagementControlRelatedDeviceGroup
-        register(0xFF)
+        register_class 0xFF
       end
     end
 
     class ProfileGroup < Base
-      register(0x0E)
+      register_class_group 0x0E
 
       class NodeProfile < ProfileGroup
-        register(0xF0)
-
-        EPC = {
-          self_node_instance_list_s: 0xD6
-        }
-
-        def receive_self_node_instance_list_s(edt)
-          instances_count = edt.shift
-
-          instances_count.times.map do
-            instance_eoj = edt.shift(3)
-            Device.from_eoj(instance_eoj, device.ip)
-          end
-        end
+        register_class 0xF0
       end
     end
   end

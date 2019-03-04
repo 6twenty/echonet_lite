@@ -6,6 +6,10 @@ require "echonet_lite/property"
 require "echonet_lite/profiles"
 require "echonet_lite/device"
 
+require "echonet_lite/properties/air_conditioner_related_device_group"
+require "echonet_lite/properties/management_control_related_device_group"
+require "echonet_lite/properties/profile_group"
+
 module EchonetLite
   ENL_PORT = 3610
   ENL_MULTICAST_ADDRESS = "224.0.23.0"
@@ -110,12 +114,12 @@ module EchonetLite
   def self.discover
     self.setup if @@thread.nil?
 
-    epc = Profiles::ProfileGroup::NodeProfile::EPC[:self_node_instance_list_s]
+    epc = Profiles::ProfileGroup::NodeProfile.properties[:self_node_instance_list_s][:epc]
     deoj = Profiles::ProfileGroup::NodeProfile.new.yield_self do |profile|
       [profile.class_group_code, profile.class_code, 0x01]
     end
 
-    Device.new(ENL_MULTICAST_ADDRESS, deoj).request_self_node_instance_list_s
+    Device.new(ENL_MULTICAST_ADDRESS, deoj).request_property(epc)
 
     # Allow time for devices to respond
     sleep 1
