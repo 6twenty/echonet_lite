@@ -1,6 +1,6 @@
 module EchonetLite
   class Property
-    attr_reader :profile
+    attr_reader :data
 
     # EPC = Echonet property code (operation status etc)
     # PDC = Property data counter (EDT bytes)
@@ -10,14 +10,13 @@ module EchonetLite
       @pdc = pdc
       @edt = edt
       @profile = profile
+      @data = profile.process_epc(@epc, @edt)
     end
 
     def name
-      @name ||= profile.class::EPC.invert[@epc]
-    end
+      return :unknown unless @profile.can_process_epc?(@epc)
 
-    def data
-      @data ||= profile.parse_edt(name, @edt)
+      @name ||= @profile.class::EPC.invert[@epc]
     end
   end
 end

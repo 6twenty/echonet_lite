@@ -1,9 +1,9 @@
 module EchonetLite
   module Profiles
-    LOOKUP = {}
+    LOOKUP = Hash.new { |hash, key| hash[key] = {} }
 
-    def self.build(eoj)
-      LOOKUP[eoj[0]][eoj[1]].new(eoj[2])
+    def self.from_eoj(eoj, device)
+      LOOKUP[eoj[0]][eoj[1]].new(device)
     end
 
     class Base
@@ -14,19 +14,17 @@ module EchonetLite
 
         group_code = self.superclass.const_get(:CODE)
 
-        LOOKUP[group_code] ||= {}
-
         LOOKUP[group_code][code] = self
       end
 
-      attr_reader :id
+      attr_reader :device
 
-      def initialize(id = 0x01)
-        @id = id
+      def initialize(device = nil)
+        @device = device
       end
 
-      def eoj
-        [class_group_code, class_code, id]
+      def type
+        "#{self.class.superclass}::#{self.class}"
       end
 
       def class_group_code
@@ -37,8 +35,18 @@ module EchonetLite
         self.class.const_get(:CODE)
       end
 
-      def parse_edt(property_name, edt)
-        send("parse_#{property_name}", edt.dup)
+      def can_process_epc?(epc)
+        return false unless self.class.const_defined?(:EPC)
+        return false unless self.class::EPC.invert.key?(epc)
+
+        true
+      end
+
+      def process_epc(epc, edt)
+        return unless can_process_epc?(epc)
+
+        epc_name = self.class::EPC.invert[epc]
+        send("receive_#{epc_name}", edt.dup)
       end
     end
 
@@ -47,6 +55,24 @@ module EchonetLite
 
       class HomeAirConditioner < AirConditionerRelatedDeviceGroup
         register(0x30)
+
+        EPC = {
+          operation_status: 0x80,
+          operation_mode_setting: 0xB0
+        }
+
+        def receive_operation_status(edt)
+          values = {
+            0x30 => :on,
+            0x31 => :off
+          }
+
+          values.fetch(edt[0], :unknown)
+        end
+
+        def receive_operation_mode_setting(edt)
+
+        end
       end
     end
 
@@ -65,28 +91,16 @@ module EchonetLite
         register(0xF0)
 
         EPC = {
-          operating_status: 0x80,
           self_node_instance_list_s: 0xD6
         }
 
-        def parse_operating_status(edt)
-          values = {
-            0x30 => :booting,
-            0x31 => :not_booting
-          }
-
-          { operating_status: values.fetch(edt, :unknown) }
-        end
-
-        def parse_self_node_instance_list_s(edt)
+        def receive_self_node_instance_list_s(edt)
           instances_count = edt.shift
 
-          profiles = instances_count.times.map do
+          instances_count.times.map do
             instance_eoj = edt.shift(3)
-            Profiles.build(instance_eoj)
+            Device.from_eoj(instance_eoj, device.ip)
           end
-
-          { self_node_instance_list_s: profiles }
         end
       end
     end

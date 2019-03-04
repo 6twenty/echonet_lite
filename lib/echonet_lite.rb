@@ -1,9 +1,6 @@
 require "socket"
 require "ipaddr"
 
-# require "echonet_lite/eoj"
-# require "echonet_lite/epc"
-# require "echonet_lite/esv"
 require "echonet_lite/frame"
 require "echonet_lite/property"
 require "echonet_lite/profiles"
@@ -16,6 +13,10 @@ module EchonetLite
   # These values never change
   EHD1 = 0x10 # (Echonet Lite)
   EHD2 = 0x81 # (Format 1)
+  TID = [0x00, 0x00] # Transaction ID (will increment)
+  SEOJ = Profiles::ManagementControlRelatedDeviceGroup::Controller.new.yield_self do |profile|
+    [profile.class_group_code, profile.class_code, 0x01]
+  end
 
   REQUEST_CODES = {
     getc: 0x60,
@@ -39,22 +40,34 @@ module EchonetLite
     setget_sna: 0x5E
   }
 
-  LISTENERS = []
-
   @@thread = nil
 
   def self.decode_msg(msg)
     msg.scan(/.{1,#{2}}/).map(&:hex)
   end
 
-  def self.encode_msg(seoj, deoj, esv, epc, edt)
-    tid = [0x36, 0x10] # (TODO: should this be able to change, e.g. increment?)
-    opc = 0x01 # (TODO: support for multiple properties?)
+  def self.encode_msg(tid, seoj, deoj, esv, epc, edt)
+    opc = 0x01 # No support for multiple properties
     pdc = edt.size
 
     msg = [EHD1, EHD2, *tid, *seoj, *deoj, esv, opc, epc, pdc, *edt]
 
     msg.pack("C*")
+  end
+
+  def self.next_tid
+    TID[1] = TID[1].next
+
+    if TID[1] > 0xFF
+      TID[1] = 0x00
+      TID[0] = TID[0].next
+
+      if TID[0] > 0xFF
+        TID[0] = 0x00
+      end
+    end
+
+    TID
   end
 
   def self.udp_send(ip, msg)
@@ -73,11 +86,11 @@ module EchonetLite
     end
   end
 
-  def self.send_OPC1(ip, seoj, deoj, esv, epc, edt = [])
-    udp_send(ip, encode_msg(seoj, deoj, esv, epc, edt))
+  def self.send_OPC1(ip, deoj, esv, epc, edt = [])
+    udp_send(ip, encode_msg(next_tid, SEOJ, deoj, esv, epc, edt))
   end
 
-  def self.start
+  def self.setup
     udps = UDPSocket.open
     udps.bind("0.0.0.0", ENL_PORT)
     mreq = IPAddr.new(ENL_MULTICAST_ADDRESS).hton + IPAddr.new("0.0.0.0").hton
@@ -90,57 +103,23 @@ module EchonetLite
         msg = packet.unpack("H*")
         msg = decode_msg(msg.first)
         frame = Frame.new(msg, ip)
-
-        LISTENERS.each do |block|
-          block.call(frame)
-        end
       end
     end
-  end
-
-  def self.add_listener(&block)
-    LISTENERS << block
-  end
-
-  def self.remove_listener(&block)
-    LISTENERS.delete(block)
   end
 
   def self.discover
-    self.start if @@thread.nil?
+    self.setup if @@thread.nil?
 
-    devices = []
-
-    listener = -> (frame) do
-      is_node_profile = frame.source_profile.is_a?(Profiles::ProfileGroup::NodeProfile)
-      has_instance_list = frame.properties.any? do |property|
-        property.name == :self_node_instance_list_s
-      end
-
-      if frame.response? && is_node_profile && has_instance_list
-        instances = frame.properties.first.data[:self_node_instance_list_s]
-
-        instances.each do |instance|
-          devices << Device.register(frame.ip, instance)
-        end
-      end
+    epc = Profiles::ProfileGroup::NodeProfile::EPC[:self_node_instance_list_s]
+    deoj = Profiles::ProfileGroup::NodeProfile.new.yield_self do |profile|
+      [profile.class_group_code, profile.class_code, 0x01]
     end
 
-    add_listener(&listener)
+    Device.new(ENL_MULTICAST_ADDRESS, deoj).request_self_node_instance_list_s
 
-    ip = ENL_MULTICAST_ADDRESS
-    seoj = Profiles::ManagementControlRelatedDeviceGroup::Controller.new.eoj
-    deoj = Profiles::ProfileGroup::NodeProfile.new.eoj
-    esv = REQUEST_CODES[:get]
-    epc = Profiles::ProfileGroup::NodeProfile::EPC[:self_node_instance_list_s]
+    # Allow time for devices to respond
+    sleep 1
 
-    send_OPC1(ip, seoj, deoj, esv, epc)
-
-    # Give it 3 seconds for devices to respond
-    sleep 3
-
-    remove_listener(&listener)
-
-    devices
+    Device::LOOKUP.values
   end
 end
