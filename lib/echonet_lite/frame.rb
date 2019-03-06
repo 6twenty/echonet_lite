@@ -158,6 +158,12 @@ module EchonetLite
       end
     end
 
+    def is_response_to?(frame)
+      self.is_a?(ResponseFrame) &&
+      frame.is_a?(RequestFrame) &&
+      frame.tid == self.tid
+    end
+
     class RequestFrame < Frame
       def device
         @device ||= Device.new(deoj, ip)
@@ -167,8 +173,12 @@ module EchonetLite
         @destination_ip
       end
 
+      def multicast?
+        ip == ENL_MULTICAST_ADDRESS
+      end
+
       def send
-        @response_frames = nil
+        @response_frames = []
 
         unless response_not_required?
           # Start UDP server to listen for responses
@@ -181,7 +191,7 @@ module EchonetLite
         msg = [ehd1, ehd2, *tid, *seoj, *deoj, esv, opc, epc, pdc, *edt].pack("C*")
 
         UDPSocket.open do |udp|
-          if ip == ENL_MULTICAST_ADDRESS
+          if multicast?
             saddr_s = Socket.pack_sockaddr_in(ENL_PORT, ip)
             mif_s = IPAddr.new(SELF_IP).hton
             udp.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_IF, mif_s)
@@ -193,36 +203,42 @@ module EchonetLite
         end
 
         unless response_not_required?
-          # TODO: could likely use a thread which waits for the response(s):
-          # - if multicase, thread waits out the timeout value
-          # - otherwise, thread exists as soon as it gets a response (up to timeout)
-          sleep TIMEOUT # Enough time for devices to respond
-
-          responses = []
-
-          loop do
-            packet, addr = udp.recvfrom_nonblock(65535)
-            ip, port = addr.values_at(3, 1)
-            msg = packet.unpack("H*").first
-            data = msg.scan(/.{1,#{2}}/).map(&:hex)
-
-            puts "got packet from #{ip}"
-
-            responses << Frame.from_bytes(data, ip)
-          rescue IO::WaitReadable # No packets left to read
-            udp.close
-            break
+          listener_thread = Thread.new do
+            await_packet(udp, multicast: multicast?)
           end
 
-          # In case some other packets arrived during this time,
-          # find those that matches the expected TID
-          @response_frames = responses.select do |frame|
-            frame.tid == self.tid && frame.is_a?(ResponseFrame)
+          # If no response, abort after <TIMEOUT>
+          timer_thread = Thread.new do
+            sleep TIMEOUT
+
+            listener_thread.kill
           end
+
+          listener_thread.join
+          timer_thread.kill
         end
 
         response_frames.each do |frame|
           frame.device.update_property(frame.epc, frame.edt)
+        end
+      ensure
+        udp&.close
+      end
+
+      def await_packet(udp, multicast: false)
+        packet, addr = udp.recvfrom(65535)
+        ip, port = addr.values_at(3, 1)
+        msg = packet.unpack("H*").first
+        data = msg.scan(/.{1,#{2}}/).map(&:hex)
+        frame = Frame.from_bytes(data, ip)
+        is_response =
+
+        if frame.is_response_to?(self)
+          response_frames << frame
+        end
+
+        if multicast || !frame.is_response_to?(self)
+          await_packet(udp, multicast: multicast)
         end
       end
 
