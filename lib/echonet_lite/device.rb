@@ -2,75 +2,51 @@ module EchonetLite
   class Device
     LOOKUP = {}
 
-    def self.from_eoj(eoj, ip)
-      LOOKUP["#{ip}_#{eoj.join('-')}"] ||= begin
-        self.new(ip, eoj)
-      end
+    def self.init(eoj, ip)
+      LOOKUP["#{eoj}#{ip}"] ||= new(eoj, ip)
     end
 
     attr_reader :ip, :profile, :properties
 
-    def initialize(ip, eoj)
+    def initialize(eoj, ip)
       @ip = ip
-      @id = eoj[2]
+      @class_group_code, @class_code, @id = eoj
       @eoj = eoj
-      @profile = Profiles.from_eoj(eoj, self)
+      @profile = Profiles::LOOKUP.dig(@class_group_code, @class_code)
       @properties = {}
     end
 
-    def handle_frame(frame)
-      # Compare TID to pending request in order to remove request locking
-      if @pending_request && @pending_request.key?(frame.tid)
-        @pending_request = nil
-      end
+    def update_property(epc_or_name, edt)
+      detail = profile.properties[epc_or_name]
+      data = process_epc(detail[:epc], edt)
 
-      return if frame.type == :response_not_possible
-
-      property_data = frame.property_data.dup
-
-      frame.opc.times do
-        epc = property_data.shift
-        pdc = property_data.shift
-        edt = property_data.shift(pdc)
-
-        receive_property(epc, pdc, edt)
-      end
+      properties[detail[:name]] = data
     end
 
     def update
-      profile.class.properties.each do |key, detail|
-        next if key.is_a?(Numeric) # Skip EPC aliases
-        next unless detail[:access].include?(:get) # Skip set requests
+      profile.properties.each do |key, detail|
+        next if key.is_a?(Numeric) # Skip the EPC aliases
+        next unless detail[:access].include?(:get) # Only get requests
 
-        request_property(detail[:epc])
-
-        while @pending_request
-          sleep 0.01
-        end
+        get_property(detail[:epc])
       end
-
-      self
     end
 
-    def request_property(epc_or_name)
-      if @pending_request
-        raise EchonetLiteError, "Device already has a pending request: #{@pending_request}"
-      end
+    def get_property(epc_or_name)
+      detail = profile.properties[epc_or_name]
+      esv = EchonetLite::Frame::ESV_CODES[:get]
+      epc = detail[:epc]
+      request_frame = Frame.for_request(@eoj, esv, epc, ip: ip)
 
-      detail = profile.class.properties[epc_or_name]
-      tid = EchonetLite.send_OPC1(ip, @eoj, ESV_CODES[:get], detail[:epc])
+      request_frame.send
 
-      @pending_request = { tid => detail[:name] }
-    end
-
-    def receive_property(epc, pdc, edt)
-      Property.new(epc, pdc, edt, self).tap do |property|
-        properties[property.name] = property.data
+      unless properties[detail[:name]]
+        p ["Failed to update property", detail[:name], request_frame.response_frames]
       end
     end
 
     def process_epc(epc, edt)
-      detail = profile.class.properties[epc]
+      detail = profile.properties[epc]
 
       send("process_epc_#{detail[:type]}", edt.dup, detail)
     end
@@ -79,8 +55,8 @@ module EchonetLite
       instances_count = edt.shift || 0
 
       instances_count.times.map do
-        instance_eoj = edt.shift(3)
-        Device.from_eoj(instance_eoj, ip)
+        eoj = edt.shift(3)
+        Device.init(eoj, ip)
       end
     end
 

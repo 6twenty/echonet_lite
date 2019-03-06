@@ -2,10 +2,6 @@ module EchonetLite
   module Profiles
     LOOKUP = Hash.new { |hash, key| hash[key] = {} }
 
-    def self.from_eoj(eoj, device)
-      LOOKUP[eoj[0]][eoj[1]].new(device)
-    end
-
     class Base
       def self.register_class_group(code)
         self.const_set(:CODE, code)
@@ -35,22 +31,12 @@ module EchonetLite
         self.class_variable_get(:@@properties)
       end
 
-      attr_reader :device
-
-      def initialize(device = nil)
-        @device = device
+      def self.class_group_code
+        self.superclass.const_get(:CODE)
       end
 
-      def type
-        "#{self.class.superclass}::#{self.class}"
-      end
-
-      def class_group_code
-        self.class.superclass.const_get(:CODE)
-      end
-
-      def class_code
-        self.class.const_get(:CODE)
+      def self.class_code
+        self.const_get(:CODE)
       end
     end
 

@@ -56,17 +56,6 @@ module EchonetLite
             0x38 => :maximum
           }
         })
-
-        register_property(0xAA, :special_state, {
-          access: %i[get],
-          type: :hash,
-          values: {
-            0x40 => :normal,
-            0x41 => :defrosting,
-            0x42 => :preheating,
-            0x43 => :heat_removal
-          }
-        })
       end
     end
   end
