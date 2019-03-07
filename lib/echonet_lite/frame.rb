@@ -62,7 +62,7 @@ module EchonetLite
         esv,
         0x01,
         epc,
-        edt.size,
+        Array(edt).size,
         *edt
       ], ip)
     end
@@ -219,7 +219,11 @@ module EchonetLite
         end
 
         response_frames.each do |frame|
-          frame.device.update_property(frame.epc, frame.edt)
+          if frame.is_a?(ResponseNotPossibleFrame)
+            p ["ResponseNotPossible", frame]
+          elsif frame.edt.size > 0
+            frame.device.update_property(frame.epc, frame.edt)
+          end
         end
       ensure
         udp&.close
@@ -231,7 +235,6 @@ module EchonetLite
         msg = packet.unpack("H*").first
         data = msg.scan(/.{1,#{2}}/).map(&:hex)
         frame = Frame.from_bytes(data, ip)
-        is_response =
 
         if frame.is_response_to?(self)
           response_frames << frame

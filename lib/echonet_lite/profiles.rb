@@ -1,8 +1,13 @@
 module EchonetLite
   module Profiles
     LOOKUP = Hash.new { |hash, key| hash[key] = {} }
+    PROPERTIES = {}
 
     class Base
+      def self.properties
+        PROPERTIES[self].all
+      end
+
       def self.register_class_group(code)
         self.const_set(:CODE, code)
       end
@@ -15,20 +20,13 @@ module EchonetLite
         LOOKUP[group_code][code] = self
       end
 
-      def self.register_property(epc, name, detail)
-        detail[:epc] = epc
+      def self.register_property(code, name, detail)
+        detail[:epc] = code
         detail[:name] = name
 
-        properties[epc] = detail
-        properties[name] = detail
-      end
+        PROPERTIES[self] ||= Properties.new(self)
 
-      def self.properties
-        unless self.class_variable_defined?(:@@properties)
-          self.class_variable_set(:@@properties, {})
-        end
-
-        self.class_variable_get(:@@properties)
+        PROPERTIES[self].add(code, name, detail)
       end
 
       def self.class_group_code
