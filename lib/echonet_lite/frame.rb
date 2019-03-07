@@ -71,7 +71,11 @@ module EchonetLite
       data = decode(data)
 
       if REQUEST_RANGE.cover?(data[:esv])
-        RequestFrame.new(data, source_ip: SELF_IP, destination_ip: ip)
+        if ip == ENL_MULTICAST_ADDRESS
+          RequestMulticastFrame.new(data, source_ip: SELF_IP, destination_ip: ip)
+        else
+          RequestFrame.new(data, source_ip: SELF_IP, destination_ip: ip)
+        end
       elsif RESPONSE_RANGE.cover?(data[:esv])
         ResponseFrame.new(data, source_ip: ip, destination_ip: SELF_IP)
       elsif RESPONSE_NOT_POSSIBLE_RANGE.cover?(data[:esv])
@@ -130,6 +134,7 @@ module EchonetLite
       @data = data
       @source_ip = source_ip
       @destination_ip = destination_ip
+      @retried = false
 
       data[:edt] ||= []
 
@@ -173,8 +178,18 @@ module EchonetLite
         @destination_ip
       end
 
+      def can_retry?
+        @retried == false
+      end
+
+      def retry!
+        @retried = true
+
+        send
+      end
+
       def multicast?
-        ip == ENL_MULTICAST_ADDRESS
+        false
       end
 
       def send
@@ -190,21 +205,11 @@ module EchonetLite
 
         msg = [ehd1, ehd2, *tid, *seoj, *deoj, esv, opc, epc, pdc, *edt].pack("C*")
 
-        UDPSocket.open do |udp|
-          if multicast?
-            saddr_s = Socket.pack_sockaddr_in(ENL_PORT, ip)
-            mif_s = IPAddr.new(SELF_IP).hton
-            udp.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_IF, mif_s)
-            udp.send(msg, 0, saddr_s)
-          else
-            udp.connect(ip, ENL_PORT)
-            udp.send(msg, 0)
-          end
-        end
+        udp_send(msg)
 
         unless response_not_required?
           listener_thread = Thread.new do
-            await_packet(udp, multicast: multicast?)
+            await_packet(udp)
           end
 
           # If no response, abort after <TIMEOUT>
@@ -218,6 +223,11 @@ module EchonetLite
           timer_thread.kill
         end
 
+        if response_frames.any?(ResponseNotPossibleFrame) && can_retry?
+          udp&.close
+          return retry!
+        end
+
         response_frames.each do |frame|
           if frame.is_a?(ResponseNotPossibleFrame)
             p ["ResponseNotPossible", frame]
@@ -229,7 +239,14 @@ module EchonetLite
         udp&.close
       end
 
-      def await_packet(udp, multicast: false)
+      def udp_send(msg)
+        UDPSocket.open do |udp|
+          udp.connect(ip, ENL_PORT)
+          udp.send(msg, 0)
+        end
+      end
+
+      def await_packet(udp)
         packet, addr = udp.recvfrom(65535)
         ip, port = addr.values_at(3, 1)
         msg = packet.unpack("H*").first
@@ -240,13 +257,44 @@ module EchonetLite
           response_frames << frame
         end
 
-        if multicast || !frame.is_response_to?(self)
-          await_packet(udp, multicast: multicast)
+        if should_await_again?(frame)
+          await_packet(udp)
         end
+      end
+
+      def should_await_again?(frame)
+        !frame.is_response_to?(self)
       end
 
       def response_not_required?
         esv == ESV_CODES[:seti]
+      end
+
+      def response_not_possible?
+        response_frame&.is_a?(ResponseNotPossibleFrame)
+      end
+
+      def response_frame
+        response_frames&.first
+      end
+    end
+
+    class RequestMulticastFrame < RequestFrame
+      def multicast?
+        true
+      end
+
+      def udp_send(msg)
+        UDPSocket.open do |udp|
+          saddr_s = Socket.pack_sockaddr_in(ENL_PORT, ip)
+          mif_s = IPAddr.new(SELF_IP).hton
+          udp.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_IF, mif_s)
+          udp.send(msg, 0, saddr_s)
+        end
+      end
+
+      def should_await_again?(frame)
+        true
       end
     end
 

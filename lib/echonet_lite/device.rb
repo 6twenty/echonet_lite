@@ -21,12 +21,7 @@ module EchonetLite
       detail = profile.properties[epc_or_name]
       data = process_epc(detail[:epc], edt)
 
-      if detail[:type] == :eoj_list
-        properties[detail[:name]] ||= []
-        properties[detail[:name]] += data
-      else
-        properties[detail[:name]] = data
-      end
+      properties[detail[:name]] = data
     end
 
     def update
@@ -49,7 +44,7 @@ module EchonetLite
 
     def get_property(name)
       detail = profile.properties[name]
-      esv = EchonetLite::Frame::ESV_CODES[:get]
+      esv = Frame::ESV_CODES[:get]
       epc = detail[:epc]
       request_frame = Frame.for_request(@eoj, esv, epc, ip: ip)
       current_value = properties.delete(detail[:name])
@@ -66,15 +61,20 @@ module EchonetLite
 
     def set_property(name, value)
       detail = profile.properties[name]
-      esv = EchonetLite::Frame::ESV_CODES[:setc]
+      esv = Frame::ESV_CODES[:setc]
       epc = detail[:epc]
-      request_frame = Frame.for_request(@eoj, esv, epc, Array(value), ip: ip)
+      request_frame = Frame.for_request(@eoj, esv, epc, value, ip: ip)
+      previous_value = properties[name]
+
+      # Assume it will be successful
+      properties[name] = value
 
       request_frame.send
 
-      sleep 0.1 # Seems it needs a moment to commit the new value
-
-      get_property(name)
+      if request_frame.response_not_possible?
+        # Revert to previous value
+        properties[name] = previous_value
+      end
     end
 
     def encode_epc(epc, value)
@@ -87,8 +87,8 @@ module EchonetLite
       detail[:values].invert[value]
     end
 
-    def encode_epc_string(value, detail)
-      value # TODO - string to bytes
+    def encode_epc_temp(value, detail)
+      value
     end
 
     def process_epc(epc, edt)
