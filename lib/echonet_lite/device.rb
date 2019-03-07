@@ -1,5 +1,6 @@
 module EchonetLite
   class Device
+    RATE_LIMIT = 1 # Seconds
     LOOKUP = {}
 
     def self.init(eoj, ip)
@@ -16,7 +17,7 @@ module EchonetLite
       @properties = {}
     end
 
-    def update_property(epc_or_name, edt)
+    def receive_property(epc_or_name, edt)
       detail = profile.properties[epc_or_name]
       data = process_epc(detail[:epc], edt)
 
@@ -29,6 +30,8 @@ module EchonetLite
     end
 
     def update
+      return properties if updated_recently?
+
       profile.properties.each do |key, detail|
         next unless detail[:access].include?(:get) # Only get requests
 
@@ -36,6 +39,12 @@ module EchonetLite
       end
 
       properties
+    end
+
+    def updated_recently?
+      return false unless @last_updated
+
+      (Time.now - @last_updated) < RATE_LIMIT
     end
 
     def get_property(name)
@@ -66,6 +75,20 @@ module EchonetLite
       sleep 0.1 # Seems it needs a moment to commit the new value
 
       get_property(name)
+    end
+
+    def encode_epc(epc, value)
+      detail = profile.properties[epc]
+
+      send("encode_epc_#{detail[:type]}", value, detail)
+    end
+
+    def encode_epc_hash(value, detail)
+      detail[:values].invert[value]
+    end
+
+    def encode_epc_string(value, detail)
+      value # TODO - string to bytes
     end
 
     def process_epc(epc, edt)

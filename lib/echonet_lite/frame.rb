@@ -222,7 +222,7 @@ module EchonetLite
           if frame.is_a?(ResponseNotPossibleFrame)
             p ["ResponseNotPossible", frame]
           elsif frame.edt.size > 0
-            frame.device.update_property(frame.epc, frame.edt)
+            frame.device.receive_property(frame.epc, frame.edt)
           end
         end
       ensure
