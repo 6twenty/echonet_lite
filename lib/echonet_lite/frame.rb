@@ -185,6 +185,8 @@ module EchonetLite
       def retry!
         @retried = true
 
+        puts "[Frame] Retrying"
+
         send
       end
 
@@ -223,7 +225,10 @@ module EchonetLite
           timer_thread.kill
         end
 
-        if response_frames.any?(ResponseNotPossibleFrame) && can_retry?
+        not_possible = response_frames.any?(ResponseNotPossibleFrame)
+        no_response = response_frames.size == 0
+
+        if (not_possible || no_response) && can_retry?
           udp&.close
           return retry!
         end

@@ -72,6 +72,8 @@ module EchonetLite
       request_frame.send
 
       if request_frame.response_not_possible?
+        p ["Response not possible", request_frame.response_frame]
+
         # Revert to previous value
         properties[name] = previous_value
       end
