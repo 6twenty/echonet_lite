@@ -7,6 +7,7 @@ module EchonetLite
     ENL_PORT = 3610
     ENL_MULTICAST_ADDRESS = "224.0.23.0"
     TIMEOUT = 1 # Seconds
+    MAX_RETRIES = 3
 
     EHD1 = 0x10 # (Echonet Lite)
     EHD2 = 0x81 # (Format 1)
@@ -134,7 +135,7 @@ module EchonetLite
       @data = data
       @source_ip = source_ip
       @destination_ip = destination_ip
-      @retried = false
+      @retry_count = 0
 
       data[:edt] ||= []
 
@@ -179,11 +180,11 @@ module EchonetLite
       end
 
       def can_retry?
-        @retried == false
+        @retry_count < MAX_RETRIES
       end
 
       def retry!
-        @retried = true
+        @retry_count = @retry_count.next
 
         puts "[Frame] Retrying"
 
