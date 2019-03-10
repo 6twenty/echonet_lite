@@ -63,7 +63,8 @@ module EchonetLite
       detail = profile.properties[name]
       esv = Frame::ESV_CODES[:setc]
       epc = detail[:epc]
-      request_frame = Frame.for_request(@eoj, esv, epc, value, ip: ip)
+      edt = encode_epc(epc, value)
+      request_frame = Frame.for_request(@eoj, esv, epc, edt, ip: ip)
       previous_value = properties[name]
 
       # Assume it will be successful
