@@ -171,6 +171,24 @@ module EchonetLite
     end
 
     class RequestFrame < Frame
+      @@send_queue = []
+      @@sending = false
+
+      # Ensures only one frame can send at a time
+      def self.send(frame)
+        @@send_queue << frame
+
+        unless @@sending
+          @@sending = true
+
+          while @@send_queue.any?
+            @@send_queue.shift.send!
+          end
+
+          @@sending = false
+        end
+      end
+
       def device
         @device ||= Device.new(deoj, ip)
       end
@@ -196,9 +214,13 @@ module EchonetLite
       end
 
       def send
+        self.class.send(self)
+      end
+
+      def send!
         @response_frames = []
 
-        unless response_not_required?
+        if response_expected?
           # Start UDP server to listen for responses
           udp = UDPSocket.open
           udp.bind(SELF_IP, ENL_PORT)
@@ -210,7 +232,7 @@ module EchonetLite
 
         udp_send(msg)
 
-        unless response_not_required?
+        if response_expected?
           listener_thread = Thread.new do
             await_packet(udp)
           end
@@ -274,6 +296,10 @@ module EchonetLite
 
       def response_not_required?
         esv == ESV_CODES[:seti]
+      end
+
+      def response_expected?
+        !response_not_required?
       end
 
       def response_not_possible?
