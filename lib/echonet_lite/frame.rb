@@ -241,6 +241,8 @@ module EchonetLite
           timer_thread = Thread.new do
             sleep TIMEOUT
 
+            puts "[Frame] Waited #{TIMEOUT}s for response; aborting"
+
             listener_thread.kill
           end
 
@@ -251,15 +253,21 @@ module EchonetLite
         not_possible = response_frames.any?(ResponseNotPossibleFrame)
         no_response = response_frames.size == 0
 
-        if (not_possible || no_response) && can_retry?
-          udp&.close
-          return retry!
+        response_frames.select(ResponseNotPossibleFrame).each do |frame|
+          puts "[Frame] Response not possible: #{frame.inspect}"
+        end
+
+        if not_possible || no_response
+          if can_retry?
+            udp&.close
+            return retry!
+          else
+            puts "[Frame] Tried #{MAX_RETRIES} times with no response"
+          end
         end
 
         response_frames.each do |frame|
-          if frame.is_a?(ResponseNotPossibleFrame)
-            p ["ResponseNotPossible", frame]
-          elsif frame.edt.size > 0
+          if frame.edt.size > 0
             frame.device.receive_property(frame.epc, frame.edt)
           end
         end
