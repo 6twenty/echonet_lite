@@ -253,8 +253,10 @@ module EchonetLite
         not_possible = response_frames.any?(ResponseNotPossibleFrame)
         no_response = response_frames.size == 0
 
-        response_frames.select(ResponseNotPossibleFrame).each do |frame|
-          puts "[Frame] Response not possible: #{frame.inspect}"
+        response_frames.each do |frame|
+          if frame.is_a?(ResponseNotPossibleFrame)
+            puts "[Frame] Response not possible: #{frame.inspect}"
+          end
         end
 
         if not_possible || no_response
