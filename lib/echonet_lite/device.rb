@@ -52,7 +52,8 @@ module EchonetLite
       request_frame.send
 
       unless properties[detail[:name]]
-        p ["Failed to get property", detail[:name], request_frame.response_frames]
+        puts "[Device] Failed to get property #{detail[:name].inspect}"
+        puts "         Response frames: #{request_frame.response_frames.inspect}"
         properties[detail[:name]] = current_value
       end
 
