@@ -6,7 +6,7 @@ module EchonetLite
 
     ENL_PORT = 3610
     ENL_MULTICAST_ADDRESS = "224.0.23.0"
-    TIMEOUT = 1 # Seconds
+    TIMEOUT = 3 # Seconds
     MAX_RETRIES = 3
 
     EHD1 = 0x10 # (Echonet Lite)
