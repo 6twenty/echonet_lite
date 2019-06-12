@@ -92,6 +92,8 @@ module EchonetLite
     end
 
     def encode_epc_temp(value, detail)
+      value = value.to_f
+
       if detail[:max] && value > detail[:max]
         detail[:max]
       elsif detail[:min] && value < detail[:min]

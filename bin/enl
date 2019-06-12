@@ -1,0 +1,86 @@
+#!/usr/bin/env ruby
+
+Dir.chdir("#{__dir__}/../")
+
+gem 'bundler' # This ensures we're using the correct version
+require "bundler/setup"
+require "echonet_lite"
+require "optparse"
+require "json"
+
+options = {}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: enl <eoj>@<ip> [options]"
+
+  opts.on("-u", "--update", "Update the device properties") do |val|
+    options[:update] = val
+  end
+
+  opts.on("-s", "--set KEY_VAL", "Set device property values in the form of key:value") do |key_val|
+    options[:set] ||= {}
+
+    key, val = key_val.split(":")
+    options[:set][key] = val
+  end
+
+  opts.on("-j", "--json", "Print output as JSON") do |val|
+    options[:json] = val
+  end
+
+  opts.on("-h", "--help", "Prints this help") do
+    puts opts
+    exit
+  end
+end.parse!
+
+class Cli
+  def initialize(options)
+    @options = options
+    @identifier = ARGV[0]
+
+    eoj, ip = @identifier.split("@")
+    eoj = eoj.split(".").map(&:to_i)
+
+    @device = EchonetLite::Device.init(eoj, ip)
+  end
+
+  def set?
+    @options[:set]&.any? || false
+  end
+
+  def update?
+    @options[:update]
+  end
+
+  def json?
+    @options[:json]
+  end
+
+  def run
+    set! if set?
+    update! if update?
+  end
+
+  private
+
+  def set!
+    @options[:set].each do |property, value|
+      @device.set_property(property, value)
+    end
+  end
+
+  def update!
+    @device.update
+
+    if json?
+      puts @device.properties.to_json
+    else
+      @device.properties.each do |property, value|
+        puts "- #{property}: #{value}"
+      end
+    end
+  end
+end
+
+Cli.new(options).run
